@@ -1,0 +1,23 @@
+* shakemap_oasisloss
+
+Aim is to use a shakemap as an oasis footprint and estimate the loss to a set
+of locations
+
+* Success
+  1. Successful estimate of portfolio loss and location level loss uncertainty
+     distribution
+  2. Function that can add footprint to a list of existing footprint database
+  3. Vulnerability function processing and add to database
+
+* Components needed
+  - Read in a shakemap and add it to a list of footprints
+  - Framework for defining the geographic scope of footprints (USGS Vs30 grid?)
+  - Framework for reading in locations and assigning them to calculation points
+  - Setup allows us to define vulnerability functions at defined damage levels
+    for whatever intensity measure
+    - Flexibility to define 2-d intensities?
+  -
+
+* Next actions
+  - Download full vs30 grid, define calculation point id based on that
+  - Create class that defines an oasis footprint on the grid
