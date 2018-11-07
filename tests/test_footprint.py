@@ -15,9 +15,9 @@ from shakemap_oasisloss import BinIntervals
 
 # shakemap grid file
 ifile = os.path.join(os.path.expanduser('~'), 'Downloads', 'usgs_shakemap',
-                     'grid_1000dyad_v11.0.xml.zip')
+                     'grid_70116556_v01.0.xml.zip')
 ifile_unc = os.path.join(os.path.expanduser('~'), 'Downloads', 'usgs_shakemap',
-                     'uncertainty_1000dyad_v11.0.xml.zip')
+                     'uncertainty_70116556_v01.0.xml.zip')
 
 # which intensity measure to use
 intensMeasure = 'MMI'
