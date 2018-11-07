@@ -2,8 +2,10 @@
 # Test Creating a footprint that accounts for uncertainty
 #
 
+import sys
 import numpy as np
 import pandas as pd
+from matplotlib import pyplot as plt
 from scipy.stats import norm
 
 from shakemap_oasisloss import BinIntervals
@@ -15,14 +17,14 @@ np.random.seed(12345)
 nLoc = 10
 
 # Define bin edges
-binEdges = np.linspace(5.0, 10.0, 6)
+binEdges = np.linspace(5.0, 10.0, 11)
 binEdges[-1] = np.Inf
 
 # Create table of means and standard deviations
 footprint0 = pd.DataFrame({
     'areaperil_id': 1 + np.arange(0, nLoc),
-    'mean': 7.5 + 5.0 * np.random.random_sample(nLoc),
-    'std': np.random.random_sample(nLoc)})
+    'm': 5.0 + 5.0 * np.random.random_sample(nLoc),
+    's': 2*np.random.random_sample(nLoc)})
 
 
 print("IN:")
@@ -68,8 +70,6 @@ def calc_probs(intervals, m0, s):
     return prob
 
 
-def calc_probs_df(df, intervals):
-    return calc_probs(intervals, df[0], df[1])
 
 
 # Check the function works for a single bin
@@ -98,14 +98,38 @@ p = calc_probs(pd.IntervalIndex.from_breaks([7.0, 8.0, 9.0], closed='left'),
                6.0, 0.0)
 print(p)
 
-# Run for entire table simultaneously
+# Calculate the probability for all mean/sd combinations
+
+# Create function to take a single row of mean/sd
+def calc_probs_df(df):
+    probs = calc_probs(bins.df.index, df[0], df[1])
+    return probs
+
+# Convert mean and std dev to an array, then calculate the probs on
+# each row of that array. The result will have each bin in columns,
+# each obs in the rows
+probs = np.apply_along_axis(calc_probs_df,
+                            axis=1,
+                            arr=footprint0.loc[:, ['m', 's']].values)
 
 
-# Reshape array
-def my_add(df, x=1):
-    return [df[0], df[1], x, df[0] + df[1], df[0]/df[1]]
+# Convert the probability array into a dataframe
+outdf = pd.DataFrame({
+    'areaperil_id': np.repeat(footprint0.areaperil_id.values, len(bins.df)),
+    'bin_id': np.tile(bins.df.bin_id.values, len(footprint0)),
+    'prob': probs.flatten()})
 
-print(footprint0.loc[:, ['mean', 'std']].apply(lambda x: my_add(x, 2), axis=1))
+# Get rid of zero probabilities
+outdf = outdf[outdf.prob > 1e-15]
+print(outdf)
 
-footprint0.loc[:, ['mean', 'std']].apply(lambda x: calc_probs_df(x, bins.df.index),
-                                         axis=1)
+# Check lot the array
+plt.imshow(probs.transpose(), interpolation=None, origin='lower',
+           extent=(0.5, nLoc+0.5, binEdges[0], 2*binEdges[-2] - binEdges[-3]))
+plt.plot(np.arange(1, nLoc+1), footprint0.m.values, '+r')
+plt.errorbar(np.arange(1, nLoc+1), footprint0.m.values,
+             yerr=0.5*footprint0.s.values, fmt="none", ecolor='r')
+plt.xticks(1 + np.arange(0, nLoc))
+plt.xlabel('areaperil_id')
+plt.ylabel('intensity')
+plt.show()
