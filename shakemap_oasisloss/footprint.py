@@ -1,5 +1,67 @@
 # Shakemap footprint
+import numpy as np
 import pandas as pd
+from scipy.stats import norm
+# import pdb
+
+
+def assign_probtobin(x, intervals):
+    """Assign 100% probability to one bin
+
+    IN:
+    x (float): value to assign
+    intervals (pandas.IntervalIndex): list of bin intervals
+
+    OUT:
+    Numpy array of floats, same shape as intervals. Either all zeros or all
+    zeros and one 1.0
+
+    """
+
+    # Initialize array of zero probabilities
+    prob = np.zeros(np.shape(intervals))
+
+    # Check if the value is within range, if so assign to the bin
+    if(intervals.contains(x)):
+        prob[intervals.get_loc(x)] = 1.0
+
+    return prob
+
+
+def calc_binprobs_norm(m0, s, intervals):
+    """Calculate the discrete probabilties for each interval given the mean and std
+    deviation of a normal distribution
+
+    IN:
+    m0 (float): mean
+    s (float): std deviation
+    intervals (pandas.IntervalIndex): bin intervals
+
+    OUT:
+    numpy array of probabilities
+
+    """
+
+    if s == 0:
+        # Standard deviation = 0, just assign m0
+        prob = assign_probtobin(m0, intervals)
+    else:
+        # CDF is Prob(X<=x)
+        # ... so Prob(X<=x2) - Prob(X<=x1) gives Prob(x1 < X <= x2)
+        # ? If we want Prob(x1 <= X < X2), it won't make a difference
+
+        # TODO: We are calculating twice here. how much time would be saved if
+        # just calculated once and checked that the bins touch each other.
+        # if intervals.is_non_overlapping_monotonic:
+        # prob
+        prob2 = norm.cdf(intervals.right, m0, s)
+        prob1 = norm.cdf(intervals.left, m0, s)
+        prob = prob2 - prob1
+
+    return prob
+
+
+# ------------------------------------------------------------------------------
 
 
 class ShakemapFootprint:
@@ -59,13 +121,7 @@ class ShakemapFootprint:
 
         return
 
-    def assign_intensbins(self, intensIntervals):
-        # TODO assign to intensity bins
-
-        return
-
-    # TODO: Function outputs to new csv file for ktools
-    def as_oasistable(self, intensbins):
+    def as_oasistable(self, intensbins, minProb=1e-9):
         """Return the table as pandas table in oasis format
 
         IN:
@@ -82,22 +138,31 @@ class ShakemapFootprint:
 
         """
 
-        out = self.df.loc[self.df['mean'] >= intensbins.min()]
+        # Get an array of probabilities with each interval as separate column
+        def myfun(x):
+            """Need function to take a single argument"""
+            return calc_binprobs_norm(x[0], x[1], intensbins.df.index)
 
-        out = out.assign(
-            intensity_bin_index=intensbins.df.loc[out['mean']].bin_id.values)
+        print('1')
+        probs = np.apply_along_axis(myfun, axis=1,
+                                    arr=self.df.loc[:, ['mean', 'std']].values)
 
-        # TODO: calculate prob within bins according to following
-        # Calculate the cdf at each interval bound
-        #
-        # for each mean and std deviation, calculate the prob density of
-        # each row
-        #
-        # Expand the table
+        print('2')
+
+        # Include the existing prob
+        probs = self.df.prob.values[:, None]*probs
+
+        # Convert to a data frame. We have to repeat the existing data frame
+        # for each intensity bin.
+        outdf = self.df.loc[:, ['event_id', 'areaperil_id']]
+        outdf = pd.concat([outdf]*len(intensbins.df), ignore_index=True)
+        outdf['intensity_bin_index'] = np.tile(intensbins.df.bin_id.values,
+                                               len(self.df))
+        outdf['prob'] = probs.flatten()
+
+        # Get rid of low probability entries
+        outdf = outdf[outdf.prob >= minProb]
 
         # Keep only needed for output
-        out = out.loc[:, ['event_id', 'areaperil_id', 'intensity_bin_index',
-                          'prob']]
-
-        return out
-    # TODO: Function appends to existing csv file for ktools
+        return outdf.loc[:, ['event_id', 'areaperil_id', 'intensity_bin_index',
+                             'prob']]
