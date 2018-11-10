@@ -47,17 +47,10 @@ def calc_probs(intervals, m0, s):
     if s == 0:
         # Standard deviation = 0, just assign m0
         prob = np.zeros(np.shape(intervals))
-        try:
-            # This only works if mean is within an interval. Use try/catch
-            # so we can return prob=0.0 for all intervals in that case
+        if intervals.contains(m0):
             prob[intervals.get_loc(m0)] = 1.0
-        except KeyError:
-            if type(m0) is float:
-                print("WARNING: mean %f out of range" % m0)
-            else:
-                raise
-        except Exception:
-            raise
+        else:
+            print("WARNING: mean %f out of range" % m0)
 
     else:
         # CDF is Prob(X<=x)
