@@ -35,12 +35,14 @@ eventId = 1
 # load the shakemap into a class
 #sm = USGSshakemapGrid(ifile, intensMeasure)
 sm = USGSshakemapGrid(ifile, intensMeasure, ifile_unc)
+print("%i grid points in shakemap" % sm.grid.size)
 
 # Define an area peril grid from the shakemap properties
 geoGrid = AreaPerilGrid(sm.xlims(False), sm.nx(), sm.ylims(False), sm.ny())
 
 # Define a footprint
 fp = ShakemapFootprint(eventId, sm, geoGrid, binedges[0])
+print("%i grid points retained in footprint" % len(fp.df))
 
 # Set up the intensity bins, display
 intensbins = BinIntervals(binedges, closed='left')
