@@ -11,7 +11,6 @@ import time
 
 from shakemap_oasisloss import BinIntervals
 from shakemap_oasisloss.footprint import calc_binprobs_norm
-from shakemap_oasisloss.footprint import assign_probtobin
 
 # Zero std deviation checks -------
 
@@ -38,7 +37,10 @@ print(p)
 np.random.seed(12345)
 
 # Number of locations with intensity
-nLoc = 10
+nLoc = 1000
+
+# Minimum probabilty to keep
+minProb = 1e-6
 
 # Define bin edges
 binEdges = np.linspace(5.0, 10.0, 11)
@@ -48,7 +50,7 @@ binEdges[-1] = np.Inf
 footprint0 = pd.DataFrame({
     'areaperil_id': 1 + np.arange(0, nLoc),
     'm': 5.0 + 5.0 * np.random.random_sample(nLoc),
-    's': 2*np.random.random_sample(nLoc)})
+    's': 1*np.random.random_sample(nLoc)})
 
 
 print("IN:")
@@ -70,32 +72,115 @@ print(bins.df.assign(prob=p))
 print("Sum Probs = %.3f" % sum(p))
 
 # Calculate the probability for all mean/sd rows
+print("Calculating all probabilities for all observations...\n")
 
-# We have to repeat the existing data frame for each intensity bin.
-outdf = footprint0
-outdf = pd.concat([outdf]*len(bins.df), ignore_index=True)
 
-# OPTION 1: Calculate a probability array
-print('**1')
+def get_probs_v1(footprint0, bins, minProb):
+    """ Calculate a probability array, then flatten it """
+    # We have to repeat the existing data frame for each intensity bin.
+    outdf = footprint0
+    outdf = pd.concat([outdf]*len(bins.df), ignore_index=True)
+
+    # Calculate bin edges
+    breaks = np.append(bins.df.index.left.values,
+                       bins.df.index.max().right)
+
+    def myfun(x):
+        """Need function to take a single argument"""
+        return calc_binprobs_norm(x[0], x[1], breaks)
+
+    # Calculate an array of probabilities
+    probs = np.apply_along_axis(myfun, axis=1,
+                                arr=footprint0.loc[:, ['m', 's']].values)
+
+    outdf = outdf.assign(bin_id=np.repeat(bins.df.bin_id.values,
+                                          len(footprint0)))
+    outdf = outdf.assign(prob=probs.flatten('F'))
+
+    # Get rid of values that are too low
+    return outdf[outdf.prob > minProb], probs
+
+
+# Time it
+print("\n**")
 tic = time.time()
+outdf, probs = get_probs_v1(footprint0, bins, minProb)
+print("%.1e s elapsed since **" % (time.time()-tic))
 
 
-def myfun(x):
-    """Need function to take a single argument"""
-    return calc_binprobs_norm(x[0], x[1], binEdges)
+def print_fp(outdf):
+    """ Display the result """
+    print(outdf.sort_values(by=['areaperil_id', 'bin_id']).head(25))
+
+    # Check the probabiltiies sum to 1
+    print("\nCheck sum(prob):")
+    print(outdf.groupby(['areaperil_id', 'm', 's']).agg({'prob': sum}))
 
 
-probs = np.apply_along_axis(myfun, axis=1,
-                            arr=footprint0.loc[:, ['m', 's']].values)
+# Display the result
+print_fp(outdf)
 
-outdf = outdf.assign(bin_id=np.repeat(bins.df.bin_id.values, len(footprint0)))
-outdf = outdf.assign(prob1=probs.flatten('F'))
+# Check plot of the array
+plt.imshow(probs.transpose(), interpolation=None, origin='lower',
+           extent=(0.5, nLoc+0.5, binEdges[0], 2*binEdges[-2] - binEdges[-3]))
+plt.plot(np.arange(1, nLoc+1), footprint0.m.values, '+r')
+plt.errorbar(np.arange(1, nLoc+1), footprint0.m.values,
+             yerr=0.5*footprint0.s.values, fmt="none", ecolor='r')
+plt.xticks(1 + np.arange(0, nLoc))
+plt.xlabel('areaperil_id')
+plt.ylabel('intensity')
+plt.show()
+
+
+# Test alternative approach to calculating probabilties
+def get_probs_v2(footprint0, bins, minProb):
+
+    # Set up output as before
+    outdf = footprint0
+    outdf = pd.concat([outdf]*len(bins.df), ignore_index=True)
+
+    # Add the bin intervals
+    outdf = outdf.assign(bin_id=np.repeat(bins.df.bin_id.values,
+                                          len(footprint0)))
+    outdf = outdf.assign(left=np.repeat(bins.df.index.left,
+                                        len(footprint0)))
+    outdf = outdf.assign(right=np.repeat(bins.df.index.right,
+                                         len(footprint0)))
+
+    # Remove bins we know will be zero prob
+    maxNsigma = norm.ppf(1-minProb, 0, 1)
+    isKeep = ((outdf.left - outdf.m < maxNsigma*outdf.s) &
+              (outdf.m - outdf.right < maxNsigma*outdf.s))
+    outdf = outdf[isKeep]
+
+    # Calculate the probabilties
+    outdf = outdf.assign(prob=(norm.cdf(outdf.right, outdf.m, outdf.s) -
+                               norm.cdf(outdf.left, outdf.m, outdf.s)))
+
+    return outdf
+
+
+print("\nAlternative approach 1 **")
+tic = time.time()
+outdf2 = get_probs_v2(footprint0, bins, minProb)
+print("%.1e s elapsed since **" % (time.time()-tic))
+
+print_fp(outdf2)
+sys.exit()
+
+outdf = outdf.assign(prob2=(norm.cdf(outdf.x2, outdf.m, outdf.s) -
+                            norm.cdf(outdf.x1, outdf.m, outdf.s)))
+
 toc = time.time()
-print("%.1e s elapsed since **1" % (toc-tic))
+print("%.1e s elapsed" % (toc-tic))
 
+sys.exit()
 
-# OPTION 1B
+# OPTION 1B: Calculate a cumulative probability array, then take the diff and
+# flatten it
+print("OPTION 1b")
 tic = time.time()
+
 
 def myfun2(x):
     return(norm.cdf(x, footprint0.m, footprint0.s))
@@ -104,18 +189,8 @@ def myfun2(x):
 probs2 = np.apply_along_axis(myfun2, axis=1, arr=binEdges[:, None])
 
 toc = time.time()
-print("%.1e s elapsed since **1" % (toc-tic))
+print("%.1e s elapsed since **2" % (toc-tic))
 
-# OPTION 2: Calculate each row in the pandas array
-
-tic = time.time()
-outdf = outdf.assign(x1=np.repeat(bins.df.index.left.values, len(footprint0)))
-outdf = outdf.assign(x2=np.repeat(bins.df.index.right.values, len(footprint0)))
-outdf = outdf.assign(prob2=(norm.cdf(outdf.x2, outdf.m, outdf.s) -
-                            norm.cdf(outdf.x1, outdf.m, outdf.s)))
-
-toc = time.time()
-print("%.1e s elapsed" % (toc-tic))
 
 # OPTION 3: filter out intervals and then calculate each row
 maxNsigma = 5
@@ -143,18 +218,3 @@ sys.exit()
 #     'prob': probs.flatten()})
 
 sys.exit()
-
-# Get rid of zero probabilities
-outdf = outdf[outdf.prob > 1e-15]
-print(outdf)
-
-# Check lot the array
-plt.imshow(probs.transpose(), interpolation=None, origin='lower',
-           extent=(0.5, nLoc+0.5, binEdges[0], 2*binEdges[-2] - binEdges[-3]))
-plt.plot(np.arange(1, nLoc+1), footprint0.m.values, '+r')
-plt.errorbar(np.arange(1, nLoc+1), footprint0.m.values,
-             yerr=0.5*footprint0.s.values, fmt="none", ecolor='r')
-plt.xticks(1 + np.arange(0, nLoc))
-plt.xlabel('areaperil_id')
-plt.ylabel('intensity')
-plt.show()
