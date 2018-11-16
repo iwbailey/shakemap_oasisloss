@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import norm
 # import pdb
+import time
 
 
 def assign_probtobin(x, intervals):
@@ -28,7 +29,7 @@ def assign_probtobin(x, intervals):
     return prob
 
 
-def calc_binprobs_norm(m0, s, intervals):
+def calc_binprobs_norm(m0, s, breaks, closed='right'):
     """Calculate the discrete probabilties for each interval given the mean and std
     deviation of a normal distribution
 
@@ -44,19 +45,14 @@ def calc_binprobs_norm(m0, s, intervals):
 
     if s == 0:
         # Standard deviation = 0, just assign m0
-        prob = assign_probtobin(m0, intervals)
+        prob = assign_probtobin(m0,
+                                pd.IntervalIndex.from_breaks(breaks,
+                                                             closed=closed))
     else:
         # CDF is Prob(X<=x)
         # ... so Prob(X<=x2) - Prob(X<=x1) gives Prob(x1 < X <= x2)
         # ? If we want Prob(x1 <= X < X2), it won't make a difference
-
-        # TODO: We are calculating twice here. how much time would be saved if
-        # just calculated once and checked that the bins touch each other.
-        # if intervals.is_non_overlapping_monotonic:
-        # prob
-        prob2 = norm.cdf(intervals.right, m0, s)
-        prob1 = norm.cdf(intervals.left, m0, s)
-        prob = prob2 - prob1
+        prob = np.diff(norm.cdf(breaks, m0, s))
 
     return prob
 
@@ -138,24 +134,28 @@ class ShakemapFootprint:
 
         """
 
-        # Get an array of probabilities with each interval as separate column
+        # We have to repeat the existing data frame for each intensity bin.
+        outdf = self.df.loc[:, ['event_id', 'areaperil_id']]
+        outdf = pd.concat([outdf]*len(intensbins.df), ignore_index=True)
+
+        # Define the points of the bin boundaries. Should be 1 more interval
+        # than number of bins
+        breaks = np.append(intensbins.df.index.left.values,
+                           intensbins.df.index.max().right)
+
+        # Calculate the prob for each bin, given each mean and std dev
         def myfun(x):
             """Need function to take a single argument"""
-            return calc_binprobs_norm(x[0], x[1], intensbins.df.index)
+            return calc_binprobs_norm(x[0], x[1], breaks,
+                                      intensbins.df.index.closed)
 
-        print('1')
         probs = np.apply_along_axis(myfun, axis=1,
                                     arr=self.df.loc[:, ['mean', 'std']].values)
 
-        print('2')
-
-        # Include the existing prob
+        # Incorporate the existing prob
         probs = self.df.prob.values[:, None]*probs
 
-        # Convert to a data frame. We have to repeat the existing data frame
-        # for each intensity bin.
-        outdf = self.df.loc[:, ['event_id', 'areaperil_id']]
-        outdf = pd.concat([outdf]*len(intensbins.df), ignore_index=True)
+        # Convert to a data frame.
         outdf['intensity_bin_index'] = np.tile(intensbins.df.bin_id.values,
                                                len(self.df))
         outdf['prob'] = probs.flatten()

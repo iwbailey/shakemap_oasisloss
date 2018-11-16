@@ -7,8 +7,32 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from scipy.stats import norm
+import time
 
 from shakemap_oasisloss import BinIntervals
+from shakemap_oasisloss.footprint import calc_binprobs_norm
+from shakemap_oasisloss.footprint import assign_probtobin
+
+# Zero std deviation checks -------
+
+# Test the impact of interval closed left vs right
+print("\nCheck case where std dev == 0 and mean is on boundary...")
+print("\tInterval is closed right, prob:")
+p = calc_binprobs_norm(8.0, 0.0, np.array([7.0, 8.0, 9.0]), closed='right')
+
+print(p)
+
+print("\tInterval is closed left, prob:")
+p = calc_binprobs_norm(8.0, 0.0, np.array([7.0, 8.0, 9.0]), closed='left')
+
+print(p)
+
+print("\tOut of range, prob:")
+p = calc_binprobs_norm(6.0, 0.0, np.array([7.0, 8.0, 9.0]))
+print(p)
+
+
+# Case with standard deviation generated randomly  --------------
 
 # Initialize random seed
 np.random.seed(12345)
@@ -36,81 +60,89 @@ bins = BinIntervals(binEdges)
 print("\nIntervals:")
 print(bins.df)
 
-# Define function to calculate uncertainty
-
-
-def calc_probs(intervals, m0, s):
-    """Calculate the discrete probabilties for each interval
-
-    """
-
-    if s == 0:
-        # Standard deviation = 0, just assign m0
-        prob = np.zeros(np.shape(intervals))
-        if intervals.contains(m0):
-            prob[intervals.get_loc(m0)] = 1.0
-        else:
-            print("WARNING: mean %f out of range" % m0)
-
-    else:
-        # CDF is Prob(X<=x)
-        # ... so Prob(X<=x2) - Prob(X<=x1) gives Prob(x1 < X <= x2)
-        # ? If we want Prob(x1 <= X < X2), it won't make a difference
-        prob2 = norm.cdf(intervals.right, m0, s)
-        prob1 = norm.cdf(intervals.left, m0, s)
-        prob = prob2 - prob1
-
-    return prob
-
-
-
-
-# Check the function works for a single bin
+# Check the function works for a single row
 m, s = footprint0.loc[3, :].values[[1, 2]]
 print("\nTest case for m=%.3f; s=%.3f:" % (m, s))
 
-p = calc_probs(bins.df.index, m, s)
+p = calc_binprobs_norm(m, s, binEdges)
 print(bins.df.assign(prob=p))
 
 print("Sum Probs = %.3f" % sum(p))
 
-# Test the impact of interval closed left vs right
-print("\nCheck case where std dev == 0 and mean is on boundary...")
-print("\tInterval is closed right, prob:")
-p = calc_probs(pd.IntervalIndex.from_breaks([7.0, 8.0, 9.0], closed='right'),
-               8.0, 0.0)
-print(p)
+# Calculate the probability for all mean/sd rows
 
-print("\tInterval is closed left, prob:")
-p = calc_probs(pd.IntervalIndex.from_breaks([7.0, 8.0, 9.0], closed='left'),
-               8.0, 0.0)
-print(p)
+# We have to repeat the existing data frame for each intensity bin.
+outdf = footprint0
+outdf = pd.concat([outdf]*len(bins.df), ignore_index=True)
 
-print("\tOut of range, prob:")
-p = calc_probs(pd.IntervalIndex.from_breaks([7.0, 8.0, 9.0], closed='left'),
-               6.0, 0.0)
-print(p)
+# OPTION 1: Calculate a probability array
+print('**1')
+tic = time.time()
 
-# Calculate the probability for all mean/sd combinations
 
-# Create function to take a single row of mean/sd
-def calc_probs_df(df):
-    probs = calc_probs(bins.df.index, df[0], df[1])
-    return probs
+def myfun(x):
+    """Need function to take a single argument"""
+    return calc_binprobs_norm(x[0], x[1], binEdges)
 
-# Convert mean and std dev to an array, then calculate the probs on
-# each row of that array. The result will have each bin in columns,
-# each obs in the rows
-probs = np.apply_along_axis(calc_probs_df,
-                            axis=1,
+
+probs = np.apply_along_axis(myfun, axis=1,
                             arr=footprint0.loc[:, ['m', 's']].values)
+
+outdf = outdf.assign(bin_id=np.repeat(bins.df.bin_id.values, len(footprint0)))
+outdf = outdf.assign(prob1=probs.flatten('F'))
+toc = time.time()
+print("%.1e s elapsed since **1" % (toc-tic))
+
+
+# OPTION 1B
+tic = time.time()
+
+def myfun2(x):
+    return(norm.cdf(x, footprint0.m, footprint0.s))
+
+
+probs2 = np.apply_along_axis(myfun2, axis=1, arr=binEdges[:, None])
+
+toc = time.time()
+print("%.1e s elapsed since **1" % (toc-tic))
+
+# OPTION 2: Calculate each row in the pandas array
+
+tic = time.time()
+outdf = outdf.assign(x1=np.repeat(bins.df.index.left.values, len(footprint0)))
+outdf = outdf.assign(x2=np.repeat(bins.df.index.right.values, len(footprint0)))
+outdf = outdf.assign(prob2=(norm.cdf(outdf.x2, outdf.m, outdf.s) -
+                            norm.cdf(outdf.x1, outdf.m, outdf.s)))
+
+toc = time.time()
+print("%.1e s elapsed" % (toc-tic))
+
+# OPTION 3: filter out intervals and then calculate each row
+maxNsigma = 5
+
+tic = time.time()
+isKeep = ((outdf.x1 - outdf.m < maxNsigma*outdf.s) &
+          (outdf.m - outdf.x2 < maxNsigma*outdf.s))
+outdf2 = outdf[isKeep]
+toc = time.time()
+print("%.1e s elapsed" % (toc-tic))
+
+sys.exit()
+# outdf = pd.concat([outdf]*len(bins.df), ignore_index=True)
+
+# # Convert to a data frame.
+# outdf['intensity_bin_index'] = np.tile(intensbins.df.bin_id.values,
+#                                                len(self.df))
+# outdf['prob'] = probs.flatten()
 
 
 # Convert the probability array into a dataframe
-outdf = pd.DataFrame({
-    'areaperil_id': np.repeat(footprint0.areaperil_id.values, len(bins.df)),
-    'bin_id': np.tile(bins.df.bin_id.values, len(footprint0)),
-    'prob': probs.flatten()})
+# outdf = pd.DataFrame({
+#     'areaperil_id': np.repeat(footprint0.areaperil_id.values, len(bins.df)),
+#     'bin_id':
+#     'prob': probs.flatten()})
+
+sys.exit()
 
 # Get rid of zero probabilities
 outdf = outdf[outdf.prob > 1e-15]
