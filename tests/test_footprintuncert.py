@@ -10,7 +10,58 @@ from scipy.stats import norm
 import time
 
 from shakemap_oasisloss import BinIntervals
-from shakemap_oasisloss.footprint import calc_binprobs_norm
+
+
+def assign_probtobin(x, intervals):
+    """Assign 100% probability to one bin
+
+    IN:
+    x (float): value to assign
+    intervals (pandas.IntervalIndex): list of bin intervals
+
+    OUT:
+    Numpy array of floats, same shape as intervals. Either all zeros or all
+    zeros and one 1.0
+
+    """
+
+    # Initialize array of zero probabilities
+    prob = np.zeros(np.shape(intervals))
+
+    # Check if the value is within range, if so assign to the bin
+    if(intervals.contains(x)):
+        prob[intervals.get_loc(x)] = 1.0
+
+    return prob
+
+
+def calc_binprobs_norm(m0, s, breaks, closed='right'):
+    """Calculate the discrete probabilties for each interval given the mean and std
+    deviation of a normal distribution
+
+    IN:
+    m0 (float): mean
+    s (float): std deviation
+    intervals (pandas.IntervalIndex): bin intervals
+
+    OUT:
+    numpy array of probabilities
+
+    """
+
+    if s == 0:
+        # Standard deviation = 0, just assign m0
+        prob = assign_probtobin(m0,
+                                pd.IntervalIndex.from_breaks(breaks,
+                                                             closed=closed))
+    else:
+        # CDF is Prob(X<=x)
+        # ... so Prob(X<=x2) - Prob(X<=x1) gives Prob(x1 < X <= x2)
+        # ? If we want Prob(x1 <= X < X2), it won't make a difference
+        prob = np.diff(norm.cdf(breaks, m0, s))
+
+    return prob
+
 
 # Zero std deviation checks -------
 
