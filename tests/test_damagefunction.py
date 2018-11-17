@@ -1,7 +1,6 @@
 
 
 import numpy as np
-import csv
 import os
 from matplotlib import pyplot as plt
 from matplotlib import pylab
@@ -61,4 +60,6 @@ oasisVuln = dmg.vulnarr_to_oasis()
 
 # display to terminal
 print('Footprint table:')
-print(oasisVuln.df)
+print(oasisVuln.head(10))
+print("...")
+print(oasisVuln.tail(10))
