@@ -33,7 +33,7 @@ eventId = 1
 # Script -----
 
 # load the shakemap into a class
-#sm = USGSshakemapGrid(ifile, intensMeasure)
+# sm = USGSshakemapGrid(ifile, intensMeasure)
 sm = USGSshakemapGrid(ifile, intensMeasure, ifile_unc)
 print("%i grid points in shakemap" % sm.grid.size)
 
@@ -51,11 +51,13 @@ intensbins = BinIntervals(binedges, closed='left')
 print('\nFootprint table:')
 print(fp.df.head(20))
 print('...')
+print(fp.df.tail(2))
 
 print('\nIntensity bins:')
 print(intensbins.df.head(10))
 print('...')
+print(intensbins.df.tail(2))
 
-# Get the table in oasis format with no std deviation
+# Get the table in oasis format
 print("\nFootprint:")
 print(fp.as_oasistable(intensbins).head(20))
