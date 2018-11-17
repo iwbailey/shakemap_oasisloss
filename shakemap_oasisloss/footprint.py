@@ -2,77 +2,37 @@
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
-# import pdb
-import time
-
-
-def assign_probtobin(x, intervals):
-    """Assign 100% probability to one bin
-
-    IN:
-    x (float): value to assign
-    intervals (pandas.IntervalIndex): list of bin intervals
-
-    OUT:
-    Numpy array of floats, same shape as intervals. Either all zeros or all
-    zeros and one 1.0
-
-    """
-
-    # Initialize array of zero probabilities
-    prob = np.zeros(np.shape(intervals))
-
-    # Check if the value is within range, if so assign to the bin
-    if(intervals.contains(x)):
-        prob[intervals.get_loc(x)] = 1.0
-
-    return prob
-
-
-def calc_binprobs_norm(m0, s, breaks, closed='right'):
-    """Calculate the discrete probabilties for each interval given the mean and std
-    deviation of a normal distribution
-
-    IN:
-    m0 (float): mean
-    s (float): std deviation
-    intervals (pandas.IntervalIndex): bin intervals
-
-    OUT:
-    numpy array of probabilities
-
-    """
-
-    if s == 0:
-        # Standard deviation = 0, just assign m0
-        prob = assign_probtobin(m0,
-                                pd.IntervalIndex.from_breaks(breaks,
-                                                             closed=closed))
-    else:
-        # CDF is Prob(X<=x)
-        # ... so Prob(X<=x2) - Prob(X<=x1) gives Prob(x1 < X <= x2)
-        # ? If we want Prob(x1 <= X < X2), it won't make a difference
-        prob = np.diff(norm.cdf(breaks, m0, s))
-
-    return prob
-
-
+import pdb
+import sys
 # ------------------------------------------------------------------------------
 
 
 class ShakemapFootprint:
-    # Constructor
+    # Class for a USGS shakemap grid footprint stored as a pandas dataframe
+    #
+    # Each grid point is stored as a row with the mean and std deviation of the
+    # intensity measure used.
+    #
     # IN:
     #  event_id
     #  Shakemap grid class with intensity measure & std dev defined
-    #  Intensity measure to be used
-    #  Intensity measure discretization (and min intensity)
-    #  Spatial grid definition
-    #  Number of sigma
-    #  Event index
+    #  AreaPerilGrid class
+    #  Minimum intensity
+    #  minimum probability
+    #
+    # PROPERTIES:
+    #  df is a dataframe with following columns
+    #    event_id: id for the specific footprint
+    #    areaperil_id: areaperil at which each point is defined
+    #    m0: Mean intensity
+    #    sd: std deviation of the intensity
+    #    prob: Discrete probability of this m0/sd combination
+    #
+    # If multiple shakemap grid points get assigned to the areaperil, the prob
+    # is divided among the areaperil entries
 
-    def __init__(self, eventId, shakemap, areaPerilGrid, minIntens=6.0,
-                 maxNsigma=4):
+    def __init__(self, eventId, shakemap, areaPerilMap, minIntens=6.0,
+                 minProb=1e-6):
         """
         eventId: should be an integer for the event
         shakemap: a Shakemap grid using python class from shakemap_lookup
@@ -82,42 +42,39 @@ class ShakemapFootprint:
         """
 
         # Get the shakemap as a pandas data frame
-        shakemap_df = pd.DataFrame.from_dict(shakemap.as_dict())
+        df = pd.DataFrame.from_dict(shakemap.as_dict())
+
+        # Change field name to avoid conflicts with functions
+        df = df.loc[:, ['lat', 'lon', 'm0', 'sd']]
+
+        # Assign grid to areperils
+        df = df.assign(areaperil_id=areaPerilMap.assign_xytoid(
+            df['lon'], df['lat']))
+        df = df.drop(['lat', 'lon'], 1)
+
+        # Assign prob to each areaperil based on number of grid points assigned
+        t = df.groupby('areaperil_id').size().reset_index()
+        t.columns = ['areaperil_id', 'prob']
+        t['prob'] = 1/t['prob']
+        df = pd.merge(df, t, on='areaperil_id')
 
         # TODO: check if we need to correct median to mean in case of logPSA
         # intensities
 
-        # Keep rows above the minimum
-        isKeep = (shakemap_df['median'] +
-                  maxNsigma*shakemap_df['std'] >= minIntens)
-
-        shakemap_df = shakemap_df[isKeep]
-
-        # TODO: Check case that we keep nothing
-
-        # Assign grid to calculation grid
-        shakemap_df['areaperil_id'] = areaPerilGrid.assign_gridid(
-            shakemap_df['lon'], shakemap_df['lat'])
-
-        # Create the data frame, using the fields we want
-        self.df = shakemap_df.loc[:, ['areaperil_id', 'median', 'std']]
-        self.df = self.df.reset_index()
-
-        # change field name
-        self.df.rename(columns={'median': 'mean'}, inplace=True)
+        # Keep rows only when non-zero prob of intensity above the min
+        # threshold.
+        maxNsigma = norm.ppf(1-minProb, 0, 1)
+        df = df[df.m0 + maxNsigma*df.sd >= minIntens]
 
         # Add the event id as 1st column
-        self.df.insert(0, 'event_id', eventId)
+        df.insert(0, 'event_id', eventId)
+        df = df.reset_index(drop=True)
 
-        # Add weight for number of grid results here
-        t = self.df.groupby('areaperil_id').size().reset_index()
-        t.columns = ['areaperil_id', 'prob']
-        t['prob'] = 1/t['prob']
-        self.df = pd.merge(self.df, t, on='areaperil_id')
+        self.df = df.loc[:, ['event_id', 'areaperil_id', 'm0', 'sd', 'prob']]
 
         return
 
-    def as_oasistable(self, intensbins, minProb=1e-9):
+    def as_oasistable(self, bins, minProb=1e-9):
         """Return the table as pandas table in oasis format
 
         IN:
@@ -134,35 +91,54 @@ class ShakemapFootprint:
 
         """
 
-        # We have to repeat the existing data frame for each intensity bin.
-        outdf = self.df.loc[:, ['event_id', 'areaperil_id']]
-        outdf = pd.concat([outdf]*len(intensbins.df), ignore_index=True)
+        # We have to repeat the existing data frame for each intensity
+        # bin. Note concat stacks the same data frame
+        outdf = self.df.copy(deep=True)
 
-        # Define the points of the bin boundaries. Should be 1 more interval
-        # than number of bins
-        breaks = np.append(intensbins.df.index.left.values,
-                           intensbins.df.index.max().right)
+        if np.all(abs(outdf.sd < 1e-15)):
+            # Case where all std deviations are zero. We look up the
+            # appropriate interval for the mean.
+            intervals = bins.df.index
 
-        # Calculate the prob for each bin, given each mean and std dev
-        def myfun(x):
-            """Need function to take a single argument"""
-            return calc_binprobs_norm(x[0], x[1], breaks,
-                                      intensbins.df.index.closed)
+            # Filter out where mean is out of bounds
+            inbounds = np.vectorize(intervals.contains)
+            outdf = outdf.loc[inbounds(outdf.m0.values), :]
 
-        probs = np.apply_along_axis(myfun, axis=1,
-                                    arr=self.df.loc[:, ['mean', 'std']].values)
+            # Assign the rest
+            outdf = outdf.assign(bin_id=bins.df.loc[outdf.m0].bin_id.values)
 
-        # Incorporate the existing prob
-        probs = self.df.prob.values[:, None]*probs
+        elif np.all(abs(outdf.sd >= 1e-15)):
+            # Merge all combinations of the footprint and bin intervals using a
+            # common key, then drop the key
+            outdf = pd.merge(outdf.assign(key=0),
+                             bins.to_leftright().assign(key=0),
+                             on='key', how='outer').drop('key', 1)
 
-        # Convert to a data frame.
-        outdf['intensity_bin_index'] = np.tile(intensbins.df.bin_id.values,
-                                               len(self.df))
-        outdf['prob'] = probs.flatten()
+            # Remove bins we know will be zero prob
+            maxNsigma = norm.ppf(1-minProb, 0, 1)
 
-        # Get rid of low probability entries
-        outdf = outdf[outdf.prob >= minProb]
+            isKeep = ((outdf.left - outdf.m0 < maxNsigma*outdf.sd) &
+                      (outdf.m0 - outdf.right <= maxNsigma*outdf.sd))
+            outdf = outdf[isKeep]
 
-        # Keep only needed for output
+            # Calculate the probabilties and combine with existing
+            # probabilities
+            outdf['prob'] = outdf.prob * (norm.cdf(outdf.right, outdf.m0,
+                                                   outdf.sd) -
+                                          norm.cdf(outdf.left, outdf.m0,
+                                                   outdf.sd))
+
+        else:
+            print("ERROR: can't deal with mixtures of zero standard dev an not")
+            sys.exit()
+
+        # Merge the results when there've been multiple prob distributions per
+        # areaperilgrid
+        outdf = outdf.groupby(by=['event_id', 'areaperil_id', 'bin_id'],
+                              as_index=False)['prob'].sum()
+
+        # Get the correct column name
+        outdf.rename(columns={'bin_id': 'intensity_bin_index'}, inplace=True)
+
         return outdf.loc[:, ['event_id', 'areaperil_id', 'intensity_bin_index',
                              'prob']]
