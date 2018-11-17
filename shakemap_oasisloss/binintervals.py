@@ -43,7 +43,7 @@ class BinIntervals:
 
     def to_leftright(self):
         """Return the left and right edges of the bins as columns"""
-        outdf = self.df
+        outdf = self.df.copy(deep=True)
         outdf['left'] = self.df.index.left.values
         outdf['right'] = self.df.index.right.values
         outdf = outdf.reset_index(drop=True)
@@ -55,7 +55,7 @@ class BinIntervals:
         """
 
         # Get the ids in first column and rename index as used by oasis
-        outdf = self.df
+        outdf = self.df.copy(deep=True)
         outdf.columns = ['index']
 
         # Get the other fields from the index
