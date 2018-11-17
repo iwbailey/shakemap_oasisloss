@@ -76,3 +76,7 @@ class AreaPerilGrid:
             idx = ma.masked_array(ix*self.ny + iy)
 
         return idx
+
+    def assign_xytoid(self, xpts, ypts, threshold=None):
+        """Return an areaperil_id for combinations of x and y"""
+        return self.assign_gridid(xpts, ypts)
