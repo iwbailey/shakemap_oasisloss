@@ -41,6 +41,14 @@ class BinIntervals:
         """Return the minimum value of the lowest bin"""
         return self.df.index.min().left
 
+    def to_leftright(self):
+        """Return the left and right edges of the bins as columns"""
+        outdf = self.df
+        outdf['left'] = self.df.index.left.values
+        outdf['right'] = self.df.index.right.values
+        outdf = outdf.reset_index(drop=True)
+        return outdf
+
     def to_oasisdf(self, isInterp=True, interval_type=1201):
         """Return the bin intervals as an df using the oasis dict column headers.
 
