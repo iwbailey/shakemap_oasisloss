@@ -37,7 +37,7 @@ print(p)
 np.random.seed(12345)
 
 # Number of locations with intensity
-nLoc = 1000
+nLoc = 10
 
 # Minimum probabilty to keep
 minProb = 1e-6
@@ -135,17 +135,11 @@ plt.show()
 # Test alternative approach to calculating probabilties
 def get_probs_v2(footprint0, bins, minProb):
 
-    # Set up output as before
-    outdf = footprint0
-    outdf = pd.concat([outdf]*len(bins.df), ignore_index=True)
-
-    # Add the bin intervals
-    outdf = outdf.assign(bin_id=np.repeat(bins.df.bin_id.values,
-                                          len(footprint0)))
-    outdf = outdf.assign(left=np.repeat(bins.df.index.left,
-                                        len(footprint0)))
-    outdf = outdf.assign(right=np.repeat(bins.df.index.right,
-                                         len(footprint0)))
+    # Merge all combinations of the footprint and bin intervals using a common
+    # key, then drop the key
+    outdf = pd.merge(footprint0.assign(key=0),
+                     bins.to_leftright().assign(key=0),
+                     on='key', how='outer').drop('key', 1)
 
     # Remove bins we know will be zero prob
     maxNsigma = norm.ppf(1-minProb, 0, 1)
@@ -173,48 +167,5 @@ outdf = outdf.assign(prob2=(norm.cdf(outdf.x2, outdf.m, outdf.s) -
 
 toc = time.time()
 print("%.1e s elapsed" % (toc-tic))
-
-sys.exit()
-
-# OPTION 1B: Calculate a cumulative probability array, then take the diff and
-# flatten it
-print("OPTION 1b")
-tic = time.time()
-
-
-def myfun2(x):
-    return(norm.cdf(x, footprint0.m, footprint0.s))
-
-
-probs2 = np.apply_along_axis(myfun2, axis=1, arr=binEdges[:, None])
-
-toc = time.time()
-print("%.1e s elapsed since **2" % (toc-tic))
-
-
-# OPTION 3: filter out intervals and then calculate each row
-maxNsigma = 5
-
-tic = time.time()
-isKeep = ((outdf.x1 - outdf.m < maxNsigma*outdf.s) &
-          (outdf.m - outdf.x2 < maxNsigma*outdf.s))
-outdf2 = outdf[isKeep]
-toc = time.time()
-print("%.1e s elapsed" % (toc-tic))
-
-sys.exit()
-# outdf = pd.concat([outdf]*len(bins.df), ignore_index=True)
-
-# # Convert to a data frame.
-# outdf['intensity_bin_index'] = np.tile(intensbins.df.bin_id.values,
-#                                                len(self.df))
-# outdf['prob'] = probs.flatten()
-
-
-# Convert the probability array into a dataframe
-# outdf = pd.DataFrame({
-#     'areaperil_id': np.repeat(footprint0.areaperil_id.values, len(bins.df)),
-#     'bin_id':
-#     'prob': probs.flatten()})
 
 sys.exit()
