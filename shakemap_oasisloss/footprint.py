@@ -98,14 +98,14 @@ class ShakemapFootprint:
         if np.all(abs(outdf.sd < 1e-15)):
             # Case where all std deviations are zero. We look up the
             # appropriate interval for the mean.
-            intervals = bins.df.index
+            intervals = bins.intervals
 
             # Filter out where mean is out of bounds
             inbounds = np.vectorize(intervals.contains)
             outdf = outdf.loc[inbounds(outdf.m0.values), :]
 
             # Assign the rest
-            outdf = outdf.assign(bin_id=bins.df.loc[outdf.m0].bin_id.values)
+            outdf = outdf.assign(bin_id=bins.bin_id[outdf.m0].values)
 
         elif np.all(abs(outdf.sd >= 1e-15)):
             # Merge all combinations of the footprint and bin intervals using a

@@ -2,6 +2,7 @@
 
 # Dependencies
 import numpy as np
+import pandas as pd
 from shakemap_oasisloss import BinIntervals
 
 # Define the bin edges
@@ -15,4 +16,5 @@ damagebins = BinIntervals(binedges, 'right')
 damagebins.check_damagebins()
 
 # Display in oasis format
+pd.options.display.max_rows = 10
 print(damagebins.to_oasisdf())

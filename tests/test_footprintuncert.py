@@ -111,14 +111,13 @@ print(footprint0)
 bins = BinIntervals(binEdges)
 
 print("\nIntervals:")
-print(bins.df)
+print(bins.bin_id)
 
 # Check the function works for a single row
 m, s = footprint0.loc[3, :].values[[1, 2]]
 print("\nTest case for m=%.3f; s=%.3f:" % (m, s))
 
 p = calc_binprobs_norm(m, s, binEdges)
-print(bins.df.assign(prob=p))
 
 print("Sum Probs = %.3f" % sum(p))
 
@@ -130,21 +129,17 @@ def get_probs_v1(footprint0, bins, minProb):
     """ Calculate a probability array, then flatten it """
     # We have to repeat the existing data frame for each intensity bin.
     outdf = footprint0
-    outdf = pd.concat([outdf]*len(bins.df), ignore_index=True)
-
-    # Calculate bin edges
-    breaks = np.append(bins.df.index.left.values,
-                       bins.df.index.max().right)
+    outdf = pd.concat([outdf]*len(bins.bin_id), ignore_index=True)
 
     def myfun(x):
         """Need function to take a single argument"""
-        return calc_binprobs_norm(x[0], x[1], breaks)
+        return calc_binprobs_norm(x[0], x[1], bins.to_breaks())
 
     # Calculate an array of probabilities
     probs = np.apply_along_axis(myfun, axis=1,
                                 arr=footprint0.loc[:, ['m', 's']].values)
 
-    outdf = outdf.assign(bin_id=np.repeat(bins.df.bin_id.values,
+    outdf = outdf.assign(bin_id=np.repeat(bins.bin_id.values,
                                           len(footprint0)))
     outdf = outdf.assign(prob=probs.flatten('F'))
 

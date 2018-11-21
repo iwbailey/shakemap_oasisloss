@@ -18,6 +18,7 @@ binedges[-1] = float("inf")  # open upper bin
 # Random intensities
 intensities = np.random.uniform(5.0, 12.0, size=20)
 
+pd.options.display.max_rows = 10
 
 # Script ----------------------------------------------------------------------
 
@@ -31,16 +32,17 @@ print("IN:")
 print(df)
 
 # Get rid of intensities below the cutoff
+isin = np.vectorize(intensbins.bin_id.index.contains)
 print("\nIgnoring %i intensities below %.2f..." %
-      (df[df.obs < intensbins.min()].count(), intensbins.min()))
-print(df[df.obs < intensbins.min()])
-df = df[df.obs >= intensbins.min()]
+      (df[~isin(df.obs)].count(), intensbins.min()))
+
+print(df[~isin(df.obs)])
+df = df[isin(df.obs)]
 
 # Get the bin for each of the observations
-print("\nASSIGNMENT_RESULT:")
-df['bin_id'] = intensbins.df.loc[df.obs.values].bin_id.values
-df['bin_from'] = intensbins.df.loc[df.obs.values].index.left
-df['bin_to'] = intensbins.df.loc[df.obs.values].index.right
+df['bin_id'] = intensbins.bin_id[df.obs.values].values
+df['bin_from'] = intensbins.bin_id[df.obs.values].index.left
+df['bin_to'] = intensbins.bin_id[df.obs.values].index.right
 
 print(df)
 

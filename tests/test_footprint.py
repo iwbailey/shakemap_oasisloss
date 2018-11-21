@@ -29,12 +29,13 @@ binedges[-1] = float("inf")  # open upper bin
 # event id
 eventId = 1
 
+pd.options.display.max_rows = 10
 
 # Script -----
 
 # load the shakemap into a class
-# sm = USGSshakemapGrid(ifile, intensMeasure)
-sm = USGSshakemapGrid(ifile, intensMeasure, ifile_unc)
+sm = USGSshakemapGrid(ifile, intensMeasure)
+# sm = USGSshakemapGrid(ifile, intensMeasure, ifile_unc)
 print("%i grid points in shakemap" % sm.grid.size)
 
 # Define an area peril grid from the shakemap properties
@@ -49,14 +50,10 @@ intensbins = BinIntervals(binedges, closed='left')
 
 # display to terminal
 print('\nFootprint table:')
-print(fp.df.head(20))
-print('...')
-print(fp.df.tail(2))
+print(fp.df)
 
 print('\nIntensity bins:')
-print(intensbins.df.head(10))
-print('...')
-print(intensbins.df.tail(2))
+print(intensbins.bin_id)
 
 # Get the table in oasis format
 print("\nFootprint:")

@@ -3,9 +3,9 @@ import pandas as pd
 import numpy as np
 
 
-class BinIntervals:
+class BinIntervals(object):
     def __init__(self, binedges, closed='left'):
-        """Set bins. return as pandas data frame
+        """Set bins. return as pandas Series
         """
 
         # TODO: only allow left or right closed
@@ -20,32 +20,49 @@ class BinIntervals:
         nBins = len(bins)
 
         # Set up the data frame, containing only the ids
-        self.df = pd.DataFrame(1 + np.arange(0, nBins),
-                               columns=['bin_id'],
-                               index=bins)
-
+        self.bin_id = pd.Series(1 + np.arange(0, nBins), index=bins,
+                                name='bin_id')
         return
+
+    def get_intervals(self):
+        return self.bin_id.index
+
+    # Define intervals as a computed variable
+    intervals = property(get_intervals)
+
+    def to_breaks(self):
+        """Return a numpy array of the bin edges"""
+        return np.append(self.intervals.left.values, self.max())
 
     def check_damagebins(self):
         """Check that the damage ratios are okay if these are damage bins """
         # Check first interval starts with zero and last ends with 1
         EPS = 1e-12
-        if abs(self.df.index.min().left) > EPS:
+        if abs(self.min()) > EPS:
             print("WARNING: first bin does not start at 0")
 
         # TODO: check greater than 1 might actually be okay in oasis
-        if abs(self.df.index.max().right - 1) > EPS:
+        if abs(self.max() - 1) > EPS:
             print("WARNING: last bin does not end at 1.0")
 
     def min(self):
         """Return the minimum value of the lowest bin"""
-        return self.df.index.min().left
+        return self.intervals.min().left
+
+    def max(self):
+        """Return the maximum value of the highest bin"""
+        return self.intervals.max().right
+
+    def isin(self, x):
+        """From an array of values return True if within at least one bin"""
+        myfun = np.vectorize(self.intervals.contains)
+        return myfun(x)
 
     def to_leftright(self):
         """Return the left and right edges of the bins as columns"""
-        outdf = self.df.copy(deep=True)
-        outdf['left'] = self.df.index.left.values
-        outdf['right'] = self.df.index.right.values
+        outdf = self.bin_id.to_frame()
+        outdf['left'] = self.intervals.left.values
+        outdf['right'] = self.intervals.right.values
         outdf = outdf.reset_index(drop=True)
         return outdf
 
@@ -55,7 +72,7 @@ class BinIntervals:
         """
 
         # Get the ids in first column and rename index as used by oasis
-        outdf = self.df.copy(deep=True)
+        outdf = self.bin_id.to_frame()
         outdf.columns = ['index']
 
         # Get the other fields from the index
@@ -64,7 +81,8 @@ class BinIntervals:
         outdf['interpolation'] = outdf.index.mid.values
         outdf['interval_type'] = interval_type
 
-        # TODO: when a bin edge is inf, the interpolation point should be
-        # modified
+        # When a bin edge is inf, the interpolation point is modified
+        if np.isinf(self.max()):
+            outdf['interpolation'][-1] = self.intervals.max().left
 
         return outdf
