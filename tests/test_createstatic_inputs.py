@@ -8,9 +8,10 @@ from matplotlib import pylab
 from shakemap_lookup import FragilityCurve
 from shakemap_lookup import USGSshakemapGrid
 
-from damagefunction import DamageFunction
-from footprint import ShakemapFootprint
-from oasis_dicts import create_bindict
+from shakemap_oasisloss import AreaPerilGrid
+from shakemap_oasisloss import BinIntervals
+from shakemap_oasisloss import ShakemapFootprint
+from shakemap_oasisloss import DamageFunction
 
 # -----------------------------------------------------------------------------
 # Parameters
@@ -26,8 +27,11 @@ damageStateDict = {
     'very_heavy':  0.5,
     'destruction': 1.0}
 
-intensbins = np.arange(5.45, 10.15, 0.1)
-mdrbins = np.arange(0.0, 1.01, 0.01)
+intensBinEdges = np.arange(5.45, 10.15, 0.1)
+
+# Damage ratio bins
+drBinEdges = np.linspace(0.0, 1.0, 101)
+drBinEdges = np.insert(drBinEdges, 0, 0.0)
 
 vulnerability_id = 1
 event_id = 1
@@ -41,14 +45,36 @@ ofile_fp = 'static/footprint.csv'
 
 # -----------------------------------------------------------------------------
 
-#TODO set up the areaperil dict
+# Set up the damage bins ----
+damagebins = BinIntervals(drBinEdges, 'right')
 
-# Set up the intensity bins
+# Write the damage_bin_dict
+damagebins.to_oasisdf().to_csv(ofile_damdict, index=False,
+                               quoting=csv.QUOTE_NONNUMERIC)
+print("Written to %s" % ofile_damdict)
 
-intensbindict = create_bindict(mdrbins, interval_type)
+# Set up the intensity bins ----
+intensbins = BinIntervals(intensBinEdges, closed='left')
 
-# Read in shakemap as a footprint table
-fp = ShakemapFootprint(event_id, USGSshakemapGrid(ifileSM, 'MMI'), minIntens)
+# TODO: Write to file
+intensbindict.to_csv(ofile_intensdict, columns=['index', 'bin_from', 'bin_to',
+                                                'interpolation',
+                                                'interval_type'],
+                     index=False, quoting=csv.QUOTE_NONNUMERIC)
+print("Written to %s" % ofile_intensdict)
+
+
+# Read in the Shakemap ----
+myShakemap = USGSshakemapGrid(ifileSM, 'MMI')
+
+# Set up the areaperil dict ----
+areaperilMap = AreaPerilGrid(myShakemap.xlims(False), myShakemap.nx(),
+                             myShakemap.ylims(False), myShakemap.ny())
+
+# TODO: Write whatever's needed for geocoding
+
+# Read in shakemap as a footprint table ----
+fp = ShakemapFootprint(event_id, myShakemap, areaperilMap, intensbins.min())
 
 # Write to file with columns in right order
 fp.df.to_csv(ofile_fp, columns=['event_id', 'areaperil_id',
@@ -56,39 +82,17 @@ fp.df.to_csv(ofile_fp, columns=['event_id', 'areaperil_id',
              quoting=csv.QUOTE_NONNUMERIC)
 print("Written to %s" % ofile_fp)
 
-# Read in fragility curve
+# Read in fragility curve ----
 frag = FragilityCurve(ifileFrag)
 
-# Set up the shakemap footprint
-
-
-# Set up the damage function
+# Set up the damage function ----
 dmg = DamageFunction(vulnerability_id, frag, damageStateDict,
                      0.5*(intensbins[:-1] + intensbins[1:]), mdrbins)
 
-# Set up the damage dict
-damagebindict = create_bindict(mdrbins, interval_type)
-
-
-
-# Convert to pandas array with oasis headers
+# TODO: Write to file
 oasisVuln = dmg.vulnarr_to_oasis()
-
-# -----------------------------------------------------------------------------
-
 oasisVuln.to_csv(ofile_vuln, columns=['vulnerability_id',
                                       'intensity_bin_index',
                                       'damage_bin_index', 'prob'], index=False,
                  quoting=csv.QUOTE_NONNUMERIC)
 print("Written to %s" % ofile_vuln)
-
-intensbindict.to_csv(ofile_intensdict, columns=['index', 'bin_from', 'bin_to',
-                                                'interpolation',
-                                                'interval_type'],
-                     index=False, quoting=csv.QUOTE_NONNUMERIC)
-print("Written to %s" % ofile_intensdict)
-
-damagebindict.to_csv(ofile_damdict, columns=['index', 'bin_from', 'bin_to',
-                                             'interpolation', 'interval_type'],
-                     index=False, quoting=csv.QUOTE_NONNUMERIC)
-print("Written to %s" % ofile_damdict)
