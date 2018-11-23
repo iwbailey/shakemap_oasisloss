@@ -1,12 +1,8 @@
-# Create the static inputs for our file
+# Create the static inputs for our test case
 
-import sys
 import os
 from csv import QUOTE_NONNUMERIC as CSVQUOTE
 import numpy as np
-
-from matplotlib import pyplot as plt
-from matplotlib import pylab
 
 from shakemap_lookup import FragilityCurve
 from shakemap_lookup import USGSshakemapGrid
@@ -21,7 +17,8 @@ from shakemap_oasisloss import DamageFunction
 
 ifileSM = os.path.join(os.path.expanduser('~'), 'Downloads', 'usgs_shakemap',
                        'grid_70116556_v01.0.xml.zip')
-ifileSMunc = os.path.join(os.path.expanduser('~'), 'Downloads', 'usgs_shakemap',
+ifileSMunc = os.path.join(os.path.expanduser('~'), 'Downloads',
+                          'usgs_shakemap',
                           'uncertainty_70116556_v01.0.xml.zip')
 
 ifileFrag = '/home/iwbailey/projects/shakemap_lookup/inputs/my_fragility.csv'
