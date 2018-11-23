@@ -1,6 +1,5 @@
 # Test that the damage function is working
 
-import os
 import sys
 import numpy as np
 import pandas as pd
@@ -15,8 +14,17 @@ from shakemap_oasisloss import BinIntervals
 
 # Parameters ----
 
-# Input file
-ifile = os.path.join('.', 'inputs', 'my_fragility.csv')
+# Input fragility
+infrag = pd.DataFrame([
+    [5.0, 0.076, 0.016, 0.005, 0.0, 0.0],
+    [6.0, 0.489, 0.121, 0.031, 0.011, 0.0],
+    [7.0, 0.739, 0.558, 0.263, 0.051, 0.005],
+    [8.0, 0.908, 0.781, 0.548, 0.248, 0.051],
+    [9.0, 0.989, 0.918, 0.791, 0.532, 0.381],
+    [10.0, 0.995, 0.979, 0.928, 0.781, 0.659],
+    [11.0, 1.0, 0.994, 0.989, 0.959, 0.949]],
+                      columns=["MMI", "negligible", "moderate", "substantial",
+                               "very_heavy", "destruction"])
 
 # Map from input damage states to MDR exceeded
 damageStateDict = {
@@ -69,7 +77,7 @@ def checkplot_interpolatedamage(frag, exprobcurves):
 # Script -----
 
 # Read in fragility curve
-frag = FragilityCurve(ifile)
+frag = FragilityCurve(infrag)
 
 # Set up the damage bins
 drbins = BinIntervals(drbinedges, closed="right")
