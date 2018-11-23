@@ -63,6 +63,7 @@ class BinIntervals(object):
         outdf = self.bin_id.to_frame()
         outdf['left'] = self.intervals.left.values
         outdf['right'] = self.intervals.right.values
+        outdf['closed'] = self.intervals.closed
         outdf = outdf.reset_index(drop=True)
         return outdf
 
