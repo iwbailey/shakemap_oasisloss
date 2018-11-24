@@ -77,6 +77,6 @@ class AreaPerilGrid:
 
         return idx
 
-    def assign_xytoid(self, xpts, ypts, threshold=None):
+    def assign_xytoid(self, xpts, ypts):
         """Return an areaperil_id for combinations of x and y"""
         return self.assign_gridid(xpts, ypts)
