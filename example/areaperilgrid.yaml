@@ -1,0 +1,7 @@
+# Parameters for Hawaiian earthquake shakemap
+minlon: -159.00833333
+maxlon: -154.49166667
+nlon: 271
+minlat: 18.49166667
+maxlat: 22.00833333
+nlat: 211
