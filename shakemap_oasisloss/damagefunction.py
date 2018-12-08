@@ -62,29 +62,29 @@ class DamageFunction:
         """
 
         # Convert to damage function from 2-d array to  single column
-        p = self.prob.stack().to_frame(name='prob')
-        p.index.set_names(['intens_bin', 'dmg_bin'], inplace=True)
+        df = self.prob.stack().to_frame(name='prob')
+        df.index.set_names(['intens_bin', 'dmg_bin'], inplace=True)
 
         # Drop the low probability ones
-        p = p[p.prob >= minProb]
+        df = df[df.prob >= minProb]
 
         # Join with the intensity bins
         intensbins = intensbins.bin_id.to_frame(name='intensity_bin_id')
         intensbins.index.name = 'intens_bin'
-        p = p.join(intensbins, how='left')
+        df = df.join(intensbins, how='left')
 
         # Join with the damage bins
         drbins = drbins.bin_id.to_frame(name='damage_bin_id')
         drbins.index.name = 'dmg_bin'
-        p = p.join(drbins, how='left')
+        df = df.join(drbins, how='left')
 
         # Drop the multi-index
-        p = p.reset_index(drop=True)
+        df = df.reset_index(drop=True)
 
         # Assign the vulnerability id
-        p = p.assign(vulnerability_id=self.vulnId)
+        df = df.assign(vulnerability_id=self.vulnId)
 
         # Return the necessary columns in the right order
         # TODO: check order is correct
-        return p.loc[:, ['vulnerability_id', 'intensity_bin_id',
-                         'damage_bin_id', 'prob']]
+        return df.loc[:, ['vulnerability_id', 'intensity_bin_id',
+                          'damage_bin_id', 'prob']]
