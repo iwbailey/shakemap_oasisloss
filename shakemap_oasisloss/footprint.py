@@ -2,8 +2,9 @@
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
-import pdb
-import sys
+
+# import pdb
+
 # ------------------------------------------------------------------------------
 
 
@@ -128,9 +129,10 @@ class ShakemapFootprint:
                                           norm.cdf(outdf.left, outdf.m0,
                                                    outdf.sd))
 
+            # TODO: check that the prob adds up to 1 for all areaperil_ids??
+
         else:
-            print("ERROR: can't deal with mixtures of zero standard dev an not")
-            sys.exit()
+            raise ValueError("Mixtures of zero and non-zero std dev")
 
         # Merge the results when there've been multiple prob distributions per
         # areaperilgrid
