@@ -6,7 +6,7 @@
 import numpy as np
 import pandas as pd
 from scipy import interpolate
-import pdb
+# import pdb
 
 
 class DamageFunction:
@@ -37,6 +37,10 @@ class DamageFunction:
         # Run the interpolation for each row, i.e. each intensity bin, output
         # the prob of exceeding the damage ratio
         probEx = np.apply_along_axis(myinterp, axis=1, arr=exprob_df.values)
+
+        # Make sure 1st column is 1.0 if including 0.0
+        if drBins.contains(0.0):
+            probEx[:, 0] = 1.0
 
         # Convert to probability of within this damage ratio. The final bin
         # remains the same.

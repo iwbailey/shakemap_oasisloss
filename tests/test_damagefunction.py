@@ -38,7 +38,8 @@ damageStateDict = {
 intensbinedges = np.linspace(5.0, 11.0, 61)
 
 # damage ratio bin edges
-drbinedges = np.linspace(0.0, 1.0, 101)
+drbinedges = np.linspace(-0.01, 1.0, 102)
+#drbinedges = np.insert(drbinedges, 0, -np.inf)
 
 # Vulnerabilty id
 vulnId = 1
@@ -142,6 +143,20 @@ plt.ylabel('Damage Ratio')
 ax.grid()
 plt.colorbar(cax, ax=ax, orientation='vertical',
              label="Exceedance Probability")
+
+# Plot exceedance prob as an array
+exprob = np.cumsum(dmg.prob.values.T[:, :], axis=0)[:, :]
+fig, ax = plt.subplots(1, 1, facecolor='white')
+cax = ax.imshow(exprob, interpolation='none', origin='lower',
+                aspect='auto',
+                extent=(intensbinedges[0], intensbinedges[-1],
+                        drbinedges[0], drbinedges[-1]),
+                vmin=0, vmax=1)
+plt.xlabel(frag.intensitymeasure)
+plt.ylabel('Damage Ratio')
+ax.grid()
+plt.colorbar(cax, ax=ax, orientation='vertical',
+             label="Cumulative Probability")
 
 
 print('Pausing while plot is shown...')
