@@ -86,4 +86,9 @@ class BinIntervals(object):
         if np.isinf(self.max()):
             outdf['interpolation'][-1] = self.intervals.max().left
 
+        if np.isinf(self.min()):
+            c = self.intervals.min().right
+            outdf.loc[0, ('bin_from')] = c
+            outdf.loc[0, ('interpolation')] = c
+
         return outdf
