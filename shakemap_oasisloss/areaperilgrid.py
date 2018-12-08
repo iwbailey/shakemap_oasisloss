@@ -8,6 +8,8 @@ class AreaPerilGrid:
     """Defines a grid with which to assign geographic coordinates. Points assigned
     to grid cells with left and bottom edges closed, i.e. x_i <= x < x_i+1
 
+    Indexing is row-order based
+
     Properties...
     x0: leftmost edge of the grid
     x1: rightmost edge of the grid
@@ -15,17 +17,14 @@ class AreaPerilGrid:
     y1: topmost edge of the grid
     nx: number of grid cells in x-axis direction
     ny: number of grid cells in y-axis direction
-    isRoworder: True = c-style row-ordered indexing, False = column-ordered
 
     """
-    def __init__(self, xlims=(-180.0, 180.0), nx=360, ylims=(-80, 80), ny=160,
-                 isRoworder=True):
+    def __init__(self, xlims=(-180.0, 180.0), nx=360, ylims=(-80, 80), ny=160):
         """Constructor takes
         xlims (float, tuple): extent in x direction
         nx (int): number of grid cells in x
         ylims (float, typle): extent in y direction, number of x dimensions
         ny (int): number of grid cells in y
-        isRoworder (bool): whether to assign grid_ids row-based or column based
         """
         self.x0 = xlims[0]  # leftmost edge of the grid
         self.x1 = xlims[1]  # rightmost edge of the grid
@@ -33,7 +32,6 @@ class AreaPerilGrid:
         self.y1 = ylims[1]
         self.nx = nx  # number of grid cells in x direction
         self.ny = ny
-        self.isRoworder = isRoworder  # C-type array indexing used
 
         return
 
@@ -70,13 +68,27 @@ class AreaPerilGrid:
         ix = self.assign_xcoords(xpts)
         iy = self.assign_ycoords(ypts)
 
-        if self.isRoworder is True:
-            idx = ma.masked_array(iy*self.nx + ix)
-        else:
-            idx = ma.masked_array(ix*self.ny + iy)
+        # Row order
+        idx = ma.masked_array(iy*self.nx + ix)
 
         return idx
 
     def assign_xytoid(self, xpts, ypts):
         """Return an areaperil_id for combinations of x and y"""
         return self.assign_gridid(xpts, ypts)
+
+    def idtoxy(self, idlist):
+        """Return a set of ids, given the list of xy"""
+
+        # TODO: check input is an array
+        # TODO: check all ids are within bounds 0 - (nx*ny)
+
+        # Row ordered so id = ix + iy*nx
+        ix = np.mod(idlist, self.nx)
+        iy = np.floor(idlist/self.nx)
+
+        # Convert to coordinates
+        xpts = self.x0 + (self.x1 - self.x0)*(ix+0.5)/self.nx
+        ypts = self.y0 + (self.y1 - self.y0)*(iy+0.5)/self.ny
+
+        return xpts, ypts

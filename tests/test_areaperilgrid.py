@@ -9,7 +9,7 @@ import pandas as pd
 from shakemap_oasisloss import AreaPerilGrid
 
 # Define the area peril grid we want to test
-a = AreaPerilGrid((-180.0, 180), 360, (-80, 80), 160, True)
+a = AreaPerilGrid((-180.0, 180), 360, (-80, 80), 160)
 
 
 # Functionsn
