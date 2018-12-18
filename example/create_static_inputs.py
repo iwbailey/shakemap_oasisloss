@@ -27,7 +27,7 @@ if isUnc:
 else:
     ifileSMunc = None
 
-ifileFrag = '/home/iwbailey/projects/shakemap_lookup/inputs/my_fragility.csv'
+ifileFrag = './example_data/my_fragility.csv'
 
 # Map from input damage states to MDR exceeded
 damageStateDict = {
@@ -77,7 +77,7 @@ print("Written to %s" % ofile_intensdict)
 
 
 # Read in the Shakemap ----
-print("Reaing shakemap...")
+print("Reading shakemap...")
 myShakemap = USGSshakemapGrid(ifileSM, 'MMI', ifileSMunc, isQuiet=True,
                               ignoreSVEL600=True)
 
