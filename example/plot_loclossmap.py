@@ -78,7 +78,7 @@ loclosses = pd.merge(loclosses, locs, left_on="coverage_id",
                      right_on="coverage_id")
 
 # Plot
-plot_lossmap(loclosses)
+plot_lossmap(loclosses, 'meanLoss', True)
 
 # Show the plot
 print('Pausing while plot is shown...')
