@@ -29,9 +29,9 @@ vuln0 = vuln0.loc[vuln0.vulnerability_id == vulnId]
 vuln0.drop('vulnerability_id', 1, inplace=True)
 
 # Set the index
-vuln0 = vuln0.set_index(['intensity_bin_id', 'damage_bin_id'])
 vuln0 = vuln0.sort_values(['intensity_bin_id', 'damage_bin_id'], axis=0,
                           ascending=[True, True])
+vuln0 = vuln0.set_index(['intensity_bin_id', 'damage_bin_id'])
 
 # Calculate cumulative and exceedance prob
 vuln1 = vuln0.groupby('intensity_bin_id').cumsum().rename(columns={'prob':
