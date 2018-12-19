@@ -32,14 +32,14 @@ ifileFrag = './example_data/my_fragility.csv'
 # Map from input damage states to MDR exceeded
 damageStateDict = {
     'negligible':  0.0,  # 0.0 means >0, not >=0
-    'moderate':    0.1,
+    'moderate':    0.10,
     'substantial': 0.25,
-    'very_heavy':  0.5,
+    'very_heavy':  0.50,
     'destruction': 1.0}
 
 intensBinEdges = np.arange(5.45, 10.15, 0.1)
-intensBinEdges[-1] = np.inf
-intensBinEdges = np.insert(intensBinEdges, 0, -np.inf)
+intensBinEdges[-1] = np.inf  # Uppermost bin includes all intensities higher
+intensBinEdges = np.insert(intensBinEdges, 0, -np.inf) # Lowermost bin
 
 # Damage ratio bins
 drBinEdges = np.linspace(0.0, 1.0, 101)
@@ -107,11 +107,10 @@ dmg = DamageFunction(vulnerability_id, frag, damageStateDict,
                      intensbins.intervals, damagebins.intervals)
 
 # Write to file
-oasisVuln = dmg.vulnarr_to_oasis(intensbins,
-                                 damagebins).to_csv(ofile_vuln, index=False,
-                                                    quoting=CSVQUOTE)
+dmg.vulnarr_to_oasis(intensbins,
+                     damagebins).to_csv(ofile_vuln, index=False,
+                                        quoting=CSVQUOTE)
 print("Written to %s" % ofile_vuln)
-
 
 # Write the random numbers to file
 print("Creating random number file...")
