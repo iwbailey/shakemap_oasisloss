@@ -74,7 +74,7 @@ class BinIntervals(object):
 
         # Get the ids in first column and rename index as used by oasis
         outdf = self.bin_id.to_frame()
-        outdf.columns = ['index']
+        outdf.columns = ['bin_index']
 
         # Get the other fields from the index
         outdf['bin_from'] = outdf.index.left.values
