@@ -74,7 +74,7 @@ axs[1].scatter(loclosses.intensity_bin_index, loclosses.meanLoss0,
                marker='o',
                alpha=0.1, edgecolors=None)
 axs[1].set_ylabel('Analytical Mean Loss')
-axs[2].set_xlabel('Intensity Bin Index')
+axs[1].set_xlabel('Intensity Bin Index')
 
 # Formatting
 for ax in axs:
