@@ -41,7 +41,7 @@ def locns2cvgs(locns):
         'coverage_id': locns['coverage_id'].values,
         'tiv': locns['tiv'].values
     })
-    return coverages
+    return coverages[['coverage_id', 'tiv']]
 
 
 def locns2items(locns):
@@ -58,7 +58,9 @@ def locns2items(locns):
         'group_id': locns['id'].values  # this defines 100% correlation
     })
 
-    return items
+    # Make sure the order is correct
+    return items[['item_id', 'coverage_id', 'areaperil_id', 'vulnerability_id',
+                  'group_id']]
 
 
 def locns2gulsummary(locns):
@@ -76,7 +78,8 @@ def locns2gulsummary(locns):
         'summary_id': 1,
     }).assign(summaryset_id=2)
 
-    return pd.concat([gulsummary1, gulsummary2], ignore_index=False)
+    gulsum = pd.concat([gulsummary1, gulsummary2], ignore_index=False)
+    return gulsum[['coverage_id', 'summary_id', 'summaryset_id']]
 
 
 # Script ----------------------------------------------------------------------
@@ -102,13 +105,12 @@ areaperilMap = AreaPerilGrid((gridparams['minlon'], gridparams['maxlon']),
 
 # Assign locations to the areaperil
 areaperilids = areaperilMap.assign_xytoid(locns.lon, locns.lat)
-
 locns = locns.assign(areaperil_id=areaperilids.data)
 
 # Remove locations that were not within grid
 if areaperilids.mask.any():
     print("Removing %i locations not geoencoded to the grid space" %
-          sum(1-areaperilids.mask))
+          sum(areaperilids.mask))
     locns = locns[areaperilids.mask == 0]
     print("%i locations left" % len(locns))
 
