@@ -46,7 +46,7 @@ vuln = pd.concat([vuln0, vuln1, vuln2], axis=1)
 
 # Read the damage bins
 dmg = read_csvtodf(ifile_dmgmap)
-dmg.set_index('index', inplace=True)
+dmg.set_index('bin_index', inplace=True)
 dmg.index.names = ['damage_bin_id']
 
 # Join
